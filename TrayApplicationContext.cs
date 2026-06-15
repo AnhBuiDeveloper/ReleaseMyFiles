@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 
 namespace ReleaseMyFiles;
 
@@ -78,10 +79,7 @@ public class TrayApplicationContext : ApplicationContext
             {
                 try
                 {
-                    using var server = new NamedPipeServerStream(
-                        Program.PipeName, PipeDirection.In,
-                        NamedPipeServerStream.MaxAllowedServerInstances,
-                        PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                    using var server = CreateSecuredPipeServer();
 
                     await server.WaitForConnectionAsync(_cts.Token);
 
@@ -112,6 +110,62 @@ public class TrayApplicationContext : ApplicationContext
                 }
             }
         }, _cts.Token);
+    }
+
+    // Security descriptor (SDDL):
+    //   D:(A;;0x12019f;;;AU)  -> grant Authenticated Users generic read/write
+    //   S:(ML;;NW;;;LW)       -> Low mandatory-integrity label, No-Write-Up
+    // The Low label lets medium-integrity clients (Explorer context-menu
+    // invocations) connect even when this tray instance runs elevated; the
+    // label must be set at creation time, so we create the pipe via the Win32
+    // CreateNamedPipe directly. Without it the elevated server rejects medium
+    // clients with "Access to the path is denied".
+    private const string PipeSddl = "D:(A;;0x12019f;;;AU)S:(ML;;NW;;;LW)";
+
+    /// <summary>
+    /// Creates a one-shot named pipe server instance secured with
+    /// <see cref="PipeSddl"/> so it is reachable across integrity levels.
+    /// </summary>
+    private static NamedPipeServerStream CreateSecuredPipeServer()
+    {
+        if (!NativeMethods.ConvertStringSecurityDescriptorToSecurityDescriptor(
+                PipeSddl, 1, out IntPtr pSecurityDescriptor, out _))
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "Failed to build pipe security descriptor.");
+        }
+
+        try
+        {
+            var sa = new NativeMethods.SECURITY_ATTRIBUTES
+            {
+                nLength = Marshal.SizeOf<NativeMethods.SECURITY_ATTRIBUTES>(),
+                lpSecurityDescriptor = pSecurityDescriptor,
+                bInheritHandle = 0
+            };
+
+            var handle = NativeMethods.CreateNamedPipe(
+                @"\\.\pipe\" + Program.PipeName,
+                NativeMethods.PIPE_ACCESS_INBOUND | NativeMethods.FILE_FLAG_OVERLAPPED,
+                NativeMethods.PIPE_TYPE_BYTE,
+                NativeMethods.PIPE_UNLIMITED_INSTANCES,
+                0, 0, 0, ref sa);
+
+            if (handle.IsInvalid)
+            {
+                throw new System.ComponentModel.Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to create named pipe.");
+            }
+
+            // isAsync: true (FILE_FLAG_OVERLAPPED), isConnected: false
+            return new NamedPipeServerStream(PipeDirection.In, true, false, handle);
+        }
+        finally
+        {
+            NativeMethods.LocalFree(pSecurityDescriptor);
+        }
     }
 
     private void HandleCommand(string command, string path)

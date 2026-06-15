@@ -1,12 +1,44 @@
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace ReleaseMyFiles;
 
 /// <summary>
-/// P/Invoke declarations for the Windows Restart Manager API (rstrtmgr.dll).
+/// P/Invoke declarations for the Windows Restart Manager API (rstrtmgr.dll)
+/// and for creating a named pipe with an explicit security descriptor.
 /// </summary>
 internal static class NativeMethods
 {
+    // --- Named pipe creation (kernel32 / advapi32) ---
+
+    public const uint PIPE_ACCESS_INBOUND = 0x00000001;
+    public const uint FILE_FLAG_OVERLAPPED = 0x40000000;
+    public const uint PIPE_TYPE_BYTE = 0x0;
+    public const uint PIPE_UNLIMITED_INSTANCES = 255;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SECURITY_ATTRIBUTES
+    {
+        public int nLength;
+        public IntPtr lpSecurityDescriptor;
+        public int bInheritHandle;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string sddl, uint revision, out IntPtr psd, out uint size);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern SafePipeHandle CreateNamedPipe(
+        string name, uint openMode, uint pipeMode, uint maxInstances,
+        uint outBufferSize, uint inBufferSize, uint defaultTimeout,
+        ref SECURITY_ATTRIBUTES securityAttributes);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
+
+    // --- Restart Manager API (rstrtmgr.dll) ---
+
     public const int RmRebootReasonNone = 0;
     public const int CCH_RM_MAX_APP_NAME = 255;
     public const int CCH_RM_MAX_SVC_NAME = 63;
