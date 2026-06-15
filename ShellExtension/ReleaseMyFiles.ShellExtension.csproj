@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableComHosting>true</EnableComHosting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ReleaseMyFiles.ShellExtension</AssemblyName>
+    <RootNamespace>ReleaseMyFiles.ShellExtension</RootNamespace>
+  </PropertyGroup>
+
+</Project>

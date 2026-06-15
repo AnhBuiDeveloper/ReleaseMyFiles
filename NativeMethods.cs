@@ -37,6 +37,11 @@ internal static class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern IntPtr LocalFree(IntPtr hMem);
 
+    // --- Taskbar application identity (shell32) ---
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
     // --- Restart Manager API (rstrtmgr.dll) ---
 
     public const int RmRebootReasonNone = 0;

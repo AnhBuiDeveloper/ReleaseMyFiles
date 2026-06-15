@@ -13,7 +13,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ShellExtension\**\*.cs" />
     <EmbeddedResource Include="Resources\app.ico" />
+    <Content Include="Packaging\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <ProjectReference Include="ShellExtension\ReleaseMyFiles.ShellExtension.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyShellExtension" AfterTargets="Build">
+    <ItemGroup>
+      <ShellExtensionFiles Include="$(MSBuildProjectDirectory)\ShellExtension\bin\$(Configuration)\net8.0-windows\ReleaseMyFiles.ShellExtension.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ShellExtensionFiles)"
+          DestinationFolder="$(TargetDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

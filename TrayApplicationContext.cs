@@ -13,6 +13,7 @@ public class TrayApplicationContext : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly CancellationTokenSource _cts = new();
     private readonly Form _hiddenForm;
+    private OptionsForm? _optionsForm;
 
     public TrayApplicationContext()
     {
@@ -48,10 +49,12 @@ public class TrayApplicationContext : ApplicationContext
             ContextMenuStrip = contextMenu
         };
 
-        _notifyIcon.DoubleClick += OnOptions;
+        _notifyIcon.MouseClick += OnTrayIconMouseClick;
 
-        // Auto-register context menus if not already done
-        if (!ContextMenuRegistrar.IsRegistered())
+        // Auto-register the modern context menu package if not already present.
+        // Keyed off the package (not IsRegistered) so stale legacy entries from
+        // an older version don't suppress installing the modern menu.
+        if (!ContextMenuRegistrar.IsPackageRegistered())
         {
             try
             {
@@ -213,8 +216,32 @@ public class TrayApplicationContext : ApplicationContext
 
     private void OnOptions(object? sender, EventArgs e)
     {
-        using var form = new OptionsForm();
-        form.ShowDialog();
+        ShowOptions();
+    }
+
+    private void OnTrayIconMouseClick(object? sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+            ShowOptions();
+    }
+
+    private void ShowOptions()
+    {
+        if (_optionsForm is { IsDisposed: false })
+        {
+            if (_optionsForm.WindowState == FormWindowState.Minimized)
+                _optionsForm.WindowState = FormWindowState.Normal;
+
+            _optionsForm.Show();
+            _optionsForm.Activate();
+            _optionsForm.BringToFront();
+            return;
+        }
+
+        _optionsForm = new OptionsForm();
+        _optionsForm.FormClosed += (_, _) => _optionsForm = null;
+        _optionsForm.Show();
+        _optionsForm.Activate();
     }
 
     private void OnExit(object? sender, EventArgs e)
@@ -222,6 +249,7 @@ public class TrayApplicationContext : ApplicationContext
         _cts.Cancel();
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _optionsForm?.Close();
         _hiddenForm.Close();
         Application.Exit();
     }
@@ -233,6 +261,7 @@ public class TrayApplicationContext : ApplicationContext
             _cts.Cancel();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+            _optionsForm?.Dispose();
             _hiddenForm.Dispose();
         }
         base.Dispose(disposing);

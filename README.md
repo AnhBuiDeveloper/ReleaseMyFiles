@@ -6,6 +6,7 @@ A Windows desktop application that resides in the system tray and offers context
 
 * System tray integration
 * Windows Explorer context menu ("Who is holding this file/folder?")
+* Native Windows 11 context menu integration
 * Displays a list of processes currently locking the selected file/folder
 * Allows terminating the locking processes
 * Options dialog for configuration

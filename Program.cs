@@ -6,13 +6,28 @@ static class Program
 {
     private const string MutexName = "Global\\ReleaseMyFiles_SingleInstance";
     internal const string PipeName = "ReleaseMyFiles_Pipe";
+    internal const string RegisterContextMenuArgument = "--register-context-menu";
+    internal const string UnregisterContextMenuArgument = "--unregister-context-menu";
 
     [STAThread]
     static void Main(string[] args)
     {
+        // A stable, versioned shell identity prevents Windows from reusing an
+        // older cached taskbar icon for this executable path.
+        NativeMethods.SetCurrentProcessExplicitAppUserModelID(
+            "AnhBuiDeveloper.ReleaseMyFiles.IconV2");
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
+        if (args.Length == 1 &&
+            (args[0].Equals(RegisterContextMenuArgument, StringComparison.OrdinalIgnoreCase) ||
+             args[0].Equals(UnregisterContextMenuArgument, StringComparison.OrdinalIgnoreCase)))
+        {
+            ChangeContextMenuRegistration(args[0]);
+            return;
+        }
 
         // Handle command-line invocations from Explorer context menu
         if (args.Length >= 2)
@@ -38,6 +53,24 @@ static class Program
         }
 
         Application.Run(new TrayApplicationContext());
+    }
+
+    private static void ChangeContextMenuRegistration(string argument)
+    {
+        try
+        {
+            bool register = argument.Equals(
+                RegisterContextMenuArgument, StringComparison.OrdinalIgnoreCase);
+            // Registration is per-user (sparse package) and needs no elevation.
+            // The elevated path exists only to clean up legacy machine-wide
+            // shell commands left by earlier versions.
+            if (!register)
+                ContextMenuRegistrar.UnregisterMachineShellCommands();
+        }
+        catch
+        {
+            Environment.ExitCode = 1;
+        }
     }
 
     /// <summary>
